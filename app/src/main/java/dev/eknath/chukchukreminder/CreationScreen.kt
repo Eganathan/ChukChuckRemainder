@@ -4,25 +4,38 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.with
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Card
 import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDefaults
+import androidx.compose.material3.DisplayMode
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -33,7 +46,8 @@ import java.util.concurrent.TimeUnit
 @Composable
 fun CreationScreen(modifier: Modifier = Modifier) {
     Scaffold(topBar = {
-        TopAppBar(title = { Text("ChukChuk-Remainder") })
+//        TopAppBar(title = { Text("ChukChuk-Remainder") }
+//        )
     }) {
         Column(
             modifier = Modifier
@@ -42,7 +56,8 @@ fun CreationScreen(modifier: Modifier = Modifier) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             val datePicker = rememberDatePickerState(
-                initialSelectedDateMillis = (getTodayInMillisAt() + TimeUnit.DAYS.toMillis(61))
+                initialSelectedDateMillis = (getTodayInMillisAt() + TimeUnit.DAYS.toMillis(61)),
+                initialDisplayMode =  DisplayMode.Picker,
             )
             val bookableInfo by remember {
                 derivedStateOf {
@@ -54,7 +69,7 @@ fun CreationScreen(modifier: Modifier = Modifier) {
 
             DatePicker(
                 state = datePicker,
-                showModeToggle = false,
+                showModeToggle = true,
                 title = { Text(" select the train start date:") },
             )
 
@@ -72,6 +87,7 @@ fun CreationScreen(modifier: Modifier = Modifier) {
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
                     )
+                    BookingCountdown(bookableInfo.bookingOpenOn)
                 }
         }
     }
@@ -127,6 +143,55 @@ private fun resetTimeTo(time: Long): Long {
         set(Calendar.MILLISECOND, 0)
     }
     return calendar.timeInMillis
+}
+
+@Composable
+fun BookingCountdown(targetTimeMillis: Long) {
+    val timeLeft by produceState(calculateTimeLeft(targetTimeMillis), targetTimeMillis) {
+        while (true) {
+            value = calculateTimeLeft(targetTimeMillis)
+            delay(1000L)
+        }
+    }
+
+    AnimatedContent(
+        targetState = timeLeft,
+    ) { time ->
+        Text(
+            text = time,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.Red
+        )
+    }
+}
+
+private fun calculateTimeLeft(targetTimeMillis: Long): String {
+    val now = System.currentTimeMillis()
+    var diff = targetTimeMillis - now
+
+    if (diff <= 0) return "Booking Open!"
+
+    val years = TimeUnit.MILLISECONDS.toDays(diff) / 365
+    if (years > 0) return "$years year${if (years > 1) "s" else ""}"
+
+    val months = TimeUnit.MILLISECONDS.toDays(diff) / 30
+    if (months > 0) return "$months month${if (months > 1) "s" else ""}"
+
+    val days = TimeUnit.MILLISECONDS.toDays(diff)
+    if (days > 0) return "$days day${if (days > 1) "s" else ""}"
+
+    val hours = TimeUnit.MILLISECONDS.toHours(diff)
+    diff -= TimeUnit.HOURS.toMillis(hours)
+    val minutes = TimeUnit.MILLISECONDS.toMinutes(diff)
+    diff -= TimeUnit.MINUTES.toMillis(minutes)
+    val seconds = TimeUnit.MILLISECONDS.toSeconds(diff)
+
+    return return when {
+        hours > 0 -> "$hours hour${if (hours > 1) "s" else ""}, $minutes min, $seconds sec"
+        minutes > 0 -> "$minutes minute${if (minutes > 1) "s" else ""} " + "$seconds second${if (seconds > 1) "s" else ""}"
+        else -> "$seconds second${if (seconds > 1) "s" else ""}"
+    }
 }
 
 // Notification with AlarmManager mode
